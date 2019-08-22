@@ -1,0 +1,18 @@
+#vertices
+#v2
+v 1 1 0
+#v1
+v 1 0 0
+#v3
+v 0 1 0
+#v0
+v 0 0 0
+#normar(como a normal e a mesma para todos os vertices, declaramos so uma) 
+#vn0
+vn 0 0 1
+#faces
+#fa
+# vp/vt(nao costumamos ter)/vn 
+f 2//1 1//1 4//1
+#fb
+f 4//1 1//1 3//1
