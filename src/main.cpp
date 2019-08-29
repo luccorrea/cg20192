@@ -32,6 +32,16 @@ float angle=0;
 glm::mat4 MODEL(1.0f);
 glm::mat4 PROJECTION(1.0f);
 
+
+struct PointLight{
+	glm::vec3 position;
+	glm::vec3 color;
+} light;
+
+struct DiffuseMaterial{
+	glm::vec3 color;
+} diffuse;
+
 // Load triangle mesh from Wavefront OBJ file
 // TODO: 10 pts (first test)
 bool readTriangleMesh(const std::string & filename,
@@ -500,7 +510,7 @@ int main(int argc, char ** argv) {
     GLuint programID;
     
     // Check if cannot create shader program
-    if (!createProgram("../res/shaders/triangle", programID)) {
+    if (!createProgram("../res/shaders/diffuse", programID)) {
         glfwTerminate();
 
         std::cout << "Cannot create shader program." << std::endl;
@@ -522,7 +532,7 @@ int main(int argc, char ** argv) {
     std::vector<size_t> textureCoordinateIndices;
     
     readTriangleMesh(
-        "../res/meshes/tetrahedron.obj",
+        "../res/meshes/dragon.obj",
         positions,
         normals,
         textureCoordinates,
@@ -547,12 +557,14 @@ int main(int argc, char ** argv) {
     // Setup view matrix
     // camera, ajustando o z, podemos controlar a distancia da camera
     glm::mat4 view = glm::lookAt(
-        glm::vec3(0.0f, 0.0f, 20.0f),
+        glm::vec3(0.0f, 0.0f, 30.0f),
         glm::vec3(0.0f),
         glm::vec3(0.0f, 1.0f, 0.0f));
     
     // Initialize projection matrix and viewport
     resize(window, 800, 600);
+    
+    //colocar luz
     
     // Render loop
     while (!glfwWindowShouldClose(window)) {
@@ -582,6 +594,8 @@ int main(int argc, char ** argv) {
         // Pass projection matrix as parameter to shader program
         GLint projectionLocationID = glGetUniformLocation(programID, "projection");
         glUniformMatrix4fv(projectionLocationID, 1, GL_FALSE, glm::value_ptr(PROJECTION));
+        
+        //colocar a luz de fundo
         
         // Draw vertex array as triangles
         glDrawArrays(GL_TRIANGLES, 0, vertexCount);
