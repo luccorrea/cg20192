@@ -16,5 +16,6 @@ void main() {
     P = (model * vec4(position, 1.0f)).xyz;
     N = normalize((transpose(inverse(model)) * vec4(normal, 0.0f)).xyz);
     UV = textureCoordinate;
+    
     gl_Position = projection * view * vec4(P, 1.0f);
 }

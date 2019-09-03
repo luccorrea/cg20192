@@ -11,136 +11,126 @@
 
 #include <glad/glad.h>
 #include <glfw/glfw3.h>
+
 #include <glm/glm.hpp>
 #include <glm/ext.hpp>
+
 #include <glm/vec3.hpp>
 #include <glm/mat3x3.hpp>
 #include <glm/mat4x4.hpp>
-#include <iostream>
-#include <vector>
+
 #include <string>
+#include <vector>
+#include <iostream>
 #include <fstream>
 #include <sstream>
 #include <algorithm>
 
-using namespace std;
-
 // Global variables
 bool BACKGROUND_STATE = false;
-float angle=0;
 
-glm::mat4 MODEL(1.0f);
 glm::mat4 PROJECTION(1.0f);
+glm::mat4 VIEW(1.0f);
+glm::mat4 MODEL(1.0f);
 
+struct Light {
+    glm::vec3 position;
+    glm::vec3 color;
+} LIGHT;
 
-struct PointLight{
-	glm::vec3 position;
-	glm::vec3 color;
-} light;
+struct Material {
+    glm::vec3 color;
+} MATERIAL;
 
-struct DiffuseMaterial{
-	glm::vec3 color;
-} diffuse;
+// Read triangle mesh from Wavefront OBJ file format
+bool readTriangleMesh(
+        const std::string & filename,
+        std::vector<glm::vec3> & positions,
+        std::vector<glm::vec3> & normals,
+        std::vector<glm::vec2> & textureCoordinates,
+        std::vector<size_t> & positionIndices,
+        std::vector<size_t> & normalIndices,
+        std::vector<size_t> & textureCoordinateIndices) {
+    std::ifstream file(filename, std::ifstream::in);
 
-// Load triangle mesh from Wavefront OBJ file
-// TODO: 10 pts (first test)
-bool readTriangleMesh(const std::string & filename,
-	std::vector < glm::vec3> & positions,
-	std::vector < glm::vec3> & normals,
-	std::vector < glm::vec2> & textureCoordinates,
-	std::vector < size_t> & positionIndices,
-	std::vector < size_t> & normalsIndices,
-	std::vector < size_t> & textureCoordinatesIndices) 
-	{
-		std::ifstream file (filename, std::ifstream::in);
-		
-		//abrindo o arquivo
-		if(!file.is_open())
-			return false;
-		else 
-		{
-			std::string line;
-			
-			//passa linha por linha do arquivo
-			while (std::getline (file, line)) 
-			{
-				//divide a linha separando pelo espaco
-				//e pega a primeira "palavra" da linha e coloca na variavel type
-				std::istringstream atribute (line);
-				std::string type;
-				atribute >> type;
-				
-				if(type == "v") //verifica se e um vertice
-				{
-					glm::vec3 p;
-					atribute >> p.x >> p.y >> p.z;
-					positions.push_back(p);
-				}
-				else if (type == "vn") //verifica se é uma normal
-				{
-					glm::vec3 n;
-					atribute >> n.x >> n.y >> n.z;
-					normals.push_back(n);
-				}
-				else if (type == "vt") 
-				{
-					glm::vec2 t;
-					atribute >> t.x >> t.y;
-					textureCoordinates.push_back(t);
-				}
-				else if (type == "f") //verifica se e uma face
-				{
-					for(int i=0; i<3; i++) 
-					{
-						std::string indices;
-						atribute >> indices;
-						
-						//troca a / por espaco
-						std::replace(indices.begin(), indices.end(), '/', ' ');
-												
-						size_t vi;
-						std::istringstream ind (indices);
-						ind >> vi;
-						positionIndices.push_back(vi-1);
-						
-						if(ind.peek() == ' ')
-						{
-							ind.ignore();
-							
-							if(ind.peek() == ' ')
-							{
-								ind.ignore();	
-								size_t vn;
-								ind >> vn;
-								normalsIndices.push_back(vn-1);	
-							}
-							else 
-							{
-								size_t vt;
-								ind>>vt;
-								textureCoordinatesIndices.push_back(vt-1);
-							
-								if(ind.peek() == ' ')
-								{
-									ind.ignore();
-									size_t vn;
-									ind >> vn;
-									normalsIndices.push_back(vn-1);
-								}		
-							}
-						}
-						 
-					}
-				}
-			
-			}
-			return true;
-		}	
-		
-	}
+    if (!file.is_open())
+        return false;
 
+    std::string line;
 
-//axercicio extra valendo 10 pontos na prova	
+    while (std::getline(file, line)) {
+        std::istringstream attributes(line);
+
+        std::string type;
+        attributes >> type;
+
+        if (type == "v") {
+            glm::vec3 position;
+            attributes >> position.x >> position.y >> position.z;
+
+            positions.push_back(position);
+        }
+        else if (type == "vt") {
+            glm::vec2 textureCoordinate;
+            attributes >> textureCoordinate.x >> textureCoordinate.y;
+
+            textureCoordinates.push_back(textureCoordinate);
+        }
+        else if (type == "vn") {
+            glm::vec3 normal;
+            attributes >> normal.x >> normal.y >> normal.z;
+
+            normals.push_back(normal);
+        }
+        else if (type == "f") {
+            for (size_t i = 0; i < 3; i++) {
+                std::string tokens;
+                attributes >> tokens;
+
+                std::replace(tokens.begin(), tokens.end(), '/', ' ');
+
+                std::istringstream indices(tokens);
+                size_t index;
+
+                indices >> index;
+                positionIndices.push_back(index - 1);
+
+                if (indices.peek() == ' ') {
+                    indices.ignore();
+
+                    if (indices.peek() == ' ') {
+                        indices.ignore();
+
+                        indices >> index;
+                        normalIndices.push_back(index - 1);
+                    }
+                    else {
+                        indices >> index;
+                        textureCoordinateIndices.push_back(index - 1);
+
+                        if (indices.peek() == ' ') {
+                            indices.ignore();
+
+                            indices >> index;
+                            normalIndices.push_back(index - 1);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    file.close();
+
+    return true;
+}
+
+// Load triangle mesh to OpenGL
+// Normal and texture coordinate attributes are calculated by primitive when not available
+// Vertex attributes are exported to shader program at locations:
+// 0: position
+// 1: normal
+// 2: texture coordinate
 size_t loadTriangleMesh(
         const std::vector<glm::vec3> & positions,
         const std::vector<glm::vec3> & normals,
@@ -151,67 +141,65 @@ size_t loadTriangleMesh(
         GLenum usage,
         GLuint & vao,
         GLuint & vbo) {
+    // Duplicate and expand the triangle vertices in a flat array
     struct Vertex {
-    	glm::vec3 position;
-    	glm::vec3 normal;
-    	glm::vec2 textureCoordinate;
-	};
+        glm::vec3 position;
+        glm::vec3 normal;
+        glm::vec2 textureCoordinate;
+    };
+    
     bool hasNormals = normalIndices.size() > 0;
     bool hasTextureCoordinates = textureCoordinateIndices.size() > 0;
     
-    std::vector<Vertex> vertices;
+    size_t vertexCount = positionIndices.size();
+    size_t vertexSize = sizeof(Vertex);
     
-    for(size_t i= 0; i < positionIndices.size() / 3; i++) {
-    	Vertex triangleVertices[3];
-    	
-    	for(size_t j = 0; j < 3; j++) {
-    		Vertex & vertex = triangleVertices[j];
-    		vertex.position = positions[positionIndices[i * 3 + j]];
-		}
-		
-		
-		if(hasNormals) {
-			for(size_t j = 0; j < 3; j++) {
-    		Vertex & vertex = triangleVertices[j];
-    		vertex.normal = normals[normalIndices[i * 3 + j]];
-			}
-		}
-		else {
-			Vertex & vertex0 = triangleVertices[0];
-			Vertex & vertex1 = triangleVertices[1];
-			Vertex & vertex2 = triangleVertices[2];
-		
-			glm::vec3 u = vertex1.position - vertex0.position;
-			glm::vec3 v = vertex1.position - vertex0.position;
-		
-			glm::vec3 n = glm::normalize(glm::cross(u,v));
-		
-			vertex0.normal = n;
-			vertex1.normal = n;
-			vertex2.normal = n;
-		
-		}	
-		if(hasTextureCoordinates){
-			for(size_t j = 0; j < 3; j++) {
-    			Vertex & vertex = triangleVertices[j];
-    			vertex.textureCoordinate = textureCoordinates[textureCoordinateIndices[i * 3 + j]];
-			}	
-		}
-		else {
-			Vertex & vertex0 = triangleVertices[0];
-			Vertex & vertex1 = triangleVertices[1];
-			Vertex & vertex2 = triangleVertices[2];
-		
-			vertex0.textureCoordinate = glm::vec2(0.0f, 0.0f);
-			vertex1.textureCoordinate = glm::vec2(1.0f, 0.0f);
-			vertex2.textureCoordinate = glm::vec2(0.0f, 1.0f);
-		
-		}
-		for(size_t i =0; i < 3; i++){
-			vertices.push_back(triangleVertices[i]);
-		}
-	}
-	 
+    std::vector<Vertex> vertices;
+    vertices.reserve(vertexCount);
+    
+    for (size_t i = 0; i < vertexCount / 3; i++) {
+        Vertex triangleVertices[3];
+        
+        for (size_t j = 0; j < 3; j++) {
+            Vertex & vertex = triangleVertices[j];
+            vertex.position = positions[positionIndices[i * 3 + j]];
+        }
+        
+        if (hasNormals) {
+            for (size_t j = 0; j < 3; j++){
+                Vertex & vertex = triangleVertices[j];
+                vertex.normal = normals[normalIndices[i * 3 + j]];
+            }
+        }
+        else {
+            Vertex & vertex0 = triangleVertices[0];
+            Vertex & vertex1 = triangleVertices[1];
+            Vertex & vertex2 = triangleVertices[2];
+            
+            glm::vec3 u = vertex1.position - vertex0.position;
+            glm::vec3 v = vertex2.position - vertex0.position;
+            
+            glm::vec3 n = glm::normalize(glm::cross(u, v));
+            
+            for (size_t j = 0; j < 3; j++) {
+                Vertex & vertex = triangleVertices[j];
+                vertex.normal = n;
+            }
+        }
+        
+        for (size_t j = 0; j < 3; j++) {
+            Vertex & vertex = triangleVertices[j];
+            
+            if (hasTextureCoordinates)
+                vertex.textureCoordinate = textureCoordinates[textureCoordinateIndices[i * 3 + j]];
+            else
+                vertex.textureCoordinate = glm::vec2((float)(j == 1), (float)(j == 2));
+        }
+        
+        for (size_t j = 0; j < 3; j++)
+            vertices.push_back(triangleVertices[j]);
+    }
+    
     // Create and bind vertex array object
     glGenVertexArrays(1, &vao);
     glBindVertexArray(vao);
@@ -223,7 +211,7 @@ size_t loadTriangleMesh(
     // Copy vertex attribute data to vertex buffer object
     glBufferData(
         GL_ARRAY_BUFFER,
-        vertices.size() * sizeof(Vertex),
+        vertices.size() * vertexSize,
         vertices.data(),
         usage);
     
@@ -232,8 +220,8 @@ size_t loadTriangleMesh(
         0,
         3,
         GL_FLOAT,
-        false,
-        sizeof(Vertex),
+        GL_FALSE,
+        vertexSize,
         (const GLvoid *)nullptr);
     
     // Enable position attribute to shader program
@@ -244,27 +232,29 @@ size_t loadTriangleMesh(
         1,
         3,
         GL_FLOAT,
-        false,
-        sizeof(Vertex),
+        GL_FALSE,
+        vertexSize,
         (const GLvoid *)(3 * sizeof(GLfloat)));
     
-    // Enable color attribute to shader program
+    // Enable normal attribute to shader program
     glEnableVertexAttribArray(1);
     
+    // Define texture coordinate attribute to shader program
     glVertexAttribPointer(
-		2,
-		2,
-		GL_FLOAT,
-		false,
-		8 * sizeof(GLfloat),
-		(const GLvoid *)(6 * sizeof(GLfloat)));
+        2,
+        2,
+        GL_FLOAT,
+        GL_FALSE,
+        vertexSize,
+        (const GLvoid *)(6 * sizeof(GLfloat)));
     
-    // Return vertex count or three (6 - two triangles) times the triangle count
+    // Enable texture coordinate attribute to shader program
     glEnableVertexAttribArray(2);
     
-    return positionIndices.size();
+    // Return vertex count or three times the triangle count
+    return vertexCount;
 }
-	
+
 // Compile shader source code from text file format
 bool compileShader(const std::string & filename, GLenum type, GLuint & id) {
     // Read from text file to string
@@ -316,7 +306,7 @@ bool compileShader(const std::string & filename, GLenum type, GLuint & id) {
 
     // Return shader id
     id = shaderID;
-
+    
     return true;
 }
 
@@ -331,7 +321,7 @@ bool createProgram(const std::string & name, GLuint & id) {
     // Load and compile fragment shader
     if (!compileShader(name + ".frag", GL_FRAGMENT_SHADER, fragmentShaderID))
         return false;
-
+    
     // Create shader program
     GLuint programID = glCreateProgram();
 
@@ -345,7 +335,7 @@ bool createProgram(const std::string & name, GLuint & id) {
     // Delete compiled shaders
     glDeleteShader(vertexShaderID);
     glDeleteShader(fragmentShaderID);
-
+    
     // Get linkage status
     GLint status;
     glGetProgramiv(programID, GL_LINK_STATUS, &status);
@@ -379,43 +369,30 @@ bool createProgram(const std::string & name, GLuint & id) {
 
 // Resize event callback
 void resize(GLFWwindow * window, int width, int height) {
-	glViewport(0, 0, width, height);
-	PROJECTION = glm::perspective(45.0f, width / (float)height, 0.001f, 1000.0f);
+    glViewport(0, 0, width, height);
+    
+    PROJECTION = glm::perspective(45.0f, width / (float)height, 0.001f, 1000.0f);
 }
 
 // Keyboard event callback
-// reponsavel por saber se o a foi apertado
 void keyboard(
-		GLFWwindow * window,
-		int key, int scancode, int action, int modifier) {
-	// verifica se o a foi apertado, e se for inverte a respota
-	if (key == GLFW_KEY_A && action == GLFW_PRESS)
-		BACKGROUND_STATE = !BACKGROUND_STATE;
-		
-	if(key == GLFW_KEY_RIGHT && (action == GLFW_PRESS || action == GLFW_REPEAT))
-		MODEL = glm::rotate(MODEL, 0.1f, glm::vec3(0.0f, 1.0f, 0.0f));	
-		
-	if(key == GLFW_KEY_LEFT && (action == GLFW_PRESS || action == GLFW_REPEAT))
-		MODEL = glm::rotate(MODEL, 0.1f, glm::vec3(0.0f, -1.0f, 0.0f));
-		
-	if(key == GLFW_KEY_UP && (action == GLFW_PRESS || action == GLFW_REPEAT))
-		MODEL = glm::rotate(MODEL, 0.1f, glm::vec3(-1.0f, 0.0f, 0.0f));
-		
-	if(key == GLFW_KEY_DOWN && (action == GLFW_PRESS || action == GLFW_REPEAT))
-		MODEL = glm::rotate(MODEL, 0.1f, glm::vec3(1.0f, 0.0f, 0.0f));
-}
-
-void cursor(GLFWwindow * window, double x, double y) {
-	MODEL = glm::translate(glm::mat4(1.0f), glm::vec3((float)(x * 0.01f), (float)(y * -0.01f), 0.0f));
-}
-
-static void cursor_position_callback(GLFWwindow* window, double xpos, double ypos)
-{
-	angle = (angle-xpos)/1000; 
-	
-	MODEL = glm::rotate(MODEL, angle, glm::vec3(0.0f, 1.0f, 0.0f));
-	
-	angle = xpos;
+        GLFWwindow * window,
+        int key, int scancode, int action, int modifier) {
+    if (key == GLFW_KEY_A && action == GLFW_PRESS)
+        BACKGROUND_STATE = !BACKGROUND_STATE;
+    
+    if (key == GLFW_KEY_RIGHT && (action == GLFW_PRESS || action == GLFW_REPEAT))
+        MODEL = glm::rotate(MODEL, 0.1f, glm::vec3(0.0f, 1.0f, 0.0f));
+        
+    if (key == GLFW_KEY_LEFT && (action == GLFW_PRESS || action == GLFW_REPEAT))
+        MODEL = glm::rotate(MODEL, 0.1f, glm::vec3(0.0f, -1.0f, 0.0f));
+        
+    if (key == GLFW_KEY_UP && (action == GLFW_PRESS || action == GLFW_REPEAT))
+        MODEL = glm::rotate(MODEL, 0.1f, glm::vec3(1.0f, 0.0f, 0.0f));
+        
+    if (key == GLFW_KEY_DOWN && (action == GLFW_PRESS || action == GLFW_REPEAT))
+        MODEL = glm::rotate(MODEL, 0.1f, glm::vec3(-1.0f, 0.0f, 0.0f));
+        
 }
 
 int main(int argc, char ** argv) {
@@ -438,32 +415,6 @@ int main(int argc, char ** argv) {
     //
     // Access the second element of the first column as float
     // std::cout << m[0][1] << std::endl;
-
-    // Access vertex position attributes of the first triangle
-    //
-    // std::vector<glm::vec3> positions;
-    // std::vector<glm::vec3> normals;
-    // std::vector<glm::vec2> textureCoordinates;
-    // std::vector<size_t> positionIndices;
-    // std::vector<size_t> normalIndices;
-    // std::vector<size_t> textureCoordinateIndices;
-
-    // if (loadTriangleMesh(
-    //         "../res/meshes/bunny.obj",
-    //         positions, normals, textureCoordinates,
-    //         positionIndices, normalIndices, textureCoordinateIndices)) {
-    //	   size_t triangleIndex = 0;
-    //	   
-    //	   glm::vec3 p0 = positions[positionIndices[triangleIndex * 3]];
-    //	   glm::vec3 p1 = positions[positionIndices[triangleIndex * 3 + 1]];
-    //	   glm::vec3 p2 = positions[positionIndices[triangleIndex * 3 + 2]];
-    //	   
-    //	   std::cout << "First triangle vertices: " << std::endl;
-    //	   
-    //	   std::cout << glm::to_string(p0) << std::endl;
-    //	   std::cout << glm::to_string(p1) << std::endl;
-    //     std::cout << glm::to_string(p2) << std::endl;
-    // }
 
     // Check GLFW initialization
     if (!glfwInit()) {
@@ -489,11 +440,8 @@ int main(int argc, char ** argv) {
     }
 
     // Register event callbacks
-    //esses sao as chamadas do calbecks, o redimencionameto do tela e o teclado
     glfwSetFramebufferSizeCallback(window, resize);
     glfwSetKeyCallback(window, keyboard);
-    //glfwSetCursorPosCallback(window, cursor);
-    glfwSetCursorPosCallback(window, cursor_position_callback);
 
     // Setup window context
     glfwMakeContextCurrent(window);
@@ -531,14 +479,19 @@ int main(int argc, char ** argv) {
     std::vector<size_t> normalIndices;
     std::vector<size_t> textureCoordinateIndices;
     
-    readTriangleMesh(
-        "../res/meshes/dragon.obj",
-        positions,
-        normals,
-        textureCoordinates,
-        positionIndices,
-        normalIndices,
-        textureCoordinateIndices);
+    if (!readTriangleMesh(
+            "../res/meshes/bunny.obj",
+            positions,
+            normals,
+            textureCoordinates,
+            positionIndices,
+            normalIndices,
+            textureCoordinateIndices)) {
+        glfwTerminate();
+
+        std::cout << "Cannot read triangle mesh." << std::endl;
+        return -1;
+    };
     
     // Load triangle mesh to OpenGL
     GLuint vao, vbo;
@@ -555,24 +508,45 @@ int main(int argc, char ** argv) {
         vbo);
     
     // Setup view matrix
-    // camera, ajustando o z, podemos controlar a distancia da camera
-    glm::mat4 view = glm::lookAt(
-        glm::vec3(0.0f, 0.0f, 30.0f),
+    VIEW = glm::lookAt(
+        glm::vec3(10.0f, 5.0f, 10.0f),
         glm::vec3(0.0f),
         glm::vec3(0.0f, 1.0f, 0.0f));
     
     // Initialize projection matrix and viewport
     resize(window, 800, 600);
     
-    //colocar luz
+    // Initialize light parameters
+    LIGHT.position = glm::vec3(0.0f, 10.0f, 0.0f);
+    LIGHT.color = glm::vec3(1.0f, 1.0f, 1.0f) * 150.0f;
+    
+    MATERIAL.color = glm::vec3(1.0f, 1.0f, 1.0f);
+    
+    // Get model matrix location in shader program
+    GLint modelLocationID = glGetUniformLocation(programID, "model");
+    
+    // Get view matrix location in shader program
+    GLint viewLocationID = glGetUniformLocation(programID, "view");
+    
+    // Get projection matrix location in shader program
+    GLint projectionLocationID = glGetUniformLocation(programID, "projection");
+    
+    // Get light position location in shader program
+    GLint lightPositionLocationID = glGetUniformLocation(programID, "light.position");
+    
+    // Get light color location in shader program
+    GLint lightColorLocationID = glGetUniformLocation(programID, "light.color");
+    
+    // Get material color location in shader program
+    GLint materialColorLocationID = glGetUniformLocation(programID, "material.color");
     
     // Render loop
     while (!glfwWindowShouldClose(window)) {
         // Setup color buffer
         if (BACKGROUND_STATE)
-            glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+            glClearColor(1.0f, 0.0f, 0.0f, 1.0f);
         else
-            glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+            glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
             
         // Clear color buffer
         glClear(GL_COLOR_BUFFER_BIT);
@@ -584,18 +558,22 @@ int main(int argc, char ** argv) {
         glClear(GL_DEPTH_BUFFER_BIT);
         
         // Pass model matrix as parameter to shader program
-        GLint modelLocationID = glGetUniformLocation(programID, "model");
         glUniformMatrix4fv(modelLocationID, 1, GL_FALSE, glm::value_ptr(MODEL));
         
         // Pass view matrix as parameter to shader program
-        GLint viewLocationID = glGetUniformLocation(programID, "view");
-        glUniformMatrix4fv(viewLocationID, 1, GL_FALSE, glm::value_ptr(view));
+        glUniformMatrix4fv(viewLocationID, 1, GL_FALSE, glm::value_ptr(VIEW));
         
         // Pass projection matrix as parameter to shader program
-        GLint projectionLocationID = glGetUniformLocation(programID, "projection");
         glUniformMatrix4fv(projectionLocationID, 1, GL_FALSE, glm::value_ptr(PROJECTION));
         
-        //colocar a luz de fundo
+        // Pass light position as parameter to shader program
+        glUniform3fv(lightPositionLocationID, 1, glm::value_ptr(LIGHT.position));
+        
+        // Pass light color as parameter to shader program
+        glUniform3fv(lightColorLocationID, 1, glm::value_ptr(LIGHT.color));
+        
+        // Pass material color as parameter to shader program
+        glUniform3fv(materialColorLocationID, 1, glm::value_ptr(MATERIAL.color));
         
         // Draw vertex array as triangles
         glDrawArrays(GL_TRIANGLES, 0, vertexCount);
